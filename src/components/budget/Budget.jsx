@@ -61,6 +61,12 @@ export default function Budget() {
         if (c.id === catId) sum += amount;
         else if (c.id !== 'other_expense') sum += (budgets[c.id] || 0);
       });
+
+      if (sum > state.monthlyBudget) {
+        addToast({ type: 'error', title: 'Budget Exceeded', message: `Cannot allocate ${formatBudgetAmount(amount, currency)}. It exceeds your overall monthly budget limit.` });
+        return;
+      }
+
       const otherAmt = Math.max(0, state.monthlyBudget - sum);
       dispatch({ type: 'SET_BUDGET', payload: { category: catId, amount } });
       dispatch({ type: 'SET_BUDGET', payload: { category: 'other_expense', amount: otherAmt } });
@@ -78,6 +84,21 @@ export default function Budget() {
     let saved = 0;
     const incomeAmtFloat = parseFloat(quickIncome) || 0;
     const overallBudgetAmtFloat = parseFloat(quickBudget) || 0;
+
+    let sum = 0;
+    CATEGORIES.expense.forEach(c => {
+      if (c.id !== 'other_expense') {
+        const val = quickAmts[c.id] !== undefined ? quickAmts[c.id] : budgets[c.id];
+        const amt = val === '' || val === undefined ? 0 : parseFloat(val);
+        if (!isNaN(amt) && amt > 0) sum += amt;
+      }
+    });
+
+    if (overallBudgetAmtFloat > 0 && sum > overallBudgetAmtFloat) {
+      addToast({ type: 'error', title: 'Budget Exceeded', message: `Category total (${formatBudgetAmount(sum, currency)}) exceeds Overall Budget limit.` });
+      return;
+    }
+
     dispatch({ type: 'SET_MONTHLY_INCOME', payload: incomeAmtFloat });
     dispatch({ type: 'SET_MONTHLY_BUDGET', payload: overallBudgetAmtFloat });
 
@@ -113,12 +134,18 @@ export default function Budget() {
 
   const saveOverallBudget = () => {
     const newOverall = parseFloat(tempMonthlyBudget) || 0;
-    dispatch({ type: 'SET_MONTHLY_BUDGET', payload: newOverall });
     
     let sum = 0;
     CATEGORIES.expense.forEach(c => {
       if (c.id !== 'other_expense') sum += (budgets[c.id] || 0);
     });
+
+    if (newOverall > 0 && newOverall < sum) {
+      addToast({ type: 'error', title: 'Invalid Budget', message: `Overall budget cannot be less than your current categorized amount (${formatBudgetAmount(sum, currency)}).` });
+      return;
+    }
+
+    dispatch({ type: 'SET_MONTHLY_BUDGET', payload: newOverall });
     const otherAmt = Math.max(0, newOverall - sum);
     dispatch({ type: 'SET_BUDGET', payload: { category: 'other_expense', amount: otherAmt } });
     
