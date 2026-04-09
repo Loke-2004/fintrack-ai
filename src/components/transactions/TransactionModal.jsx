@@ -74,7 +74,7 @@ export default function TransactionModal({ transaction, onClose }) {
       addToast({ type: 'success', title: 'Transaction added', message: `"${tx.description}" (${tx.type}) recorded!` });
     }
 
-    checkAchievements([tx, ...state.transactions], dispatch);
+    checkAchievements([tx, ...state.transactions], dispatch, state.monthlyIncome || 0);
     onClose();
   };
 

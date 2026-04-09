@@ -18,11 +18,11 @@ export default function Dashboard({ onAddTransaction }) {
   const thisWeek  = useMemo(() => transactions.filter(t => isCurrentWeek(t.date)), [transactions]);
 
   const loggedIncome = useMemo(() => thisMonth.filter(t => t.type === 'income').reduce((s,t) => s+t.amount, 0), [thisMonth]);
-  const totalIncome  = state.monthlyIncome > 0 ? state.monthlyIncome : loggedIncome;
+  const totalIncome  = (state.monthlyIncome || 0) + loggedIncome;
   const totalExpense = useMemo(() => thisMonth.filter(t => t.type === 'expense').reduce((s,t) => s+t.amount, 0), [thisMonth]);
   const balance      = totalIncome - totalExpense;
   const savingsRate  = totalIncome > 0 ? Math.round(((totalIncome-totalExpense)/totalIncome)*100) : 0;
-  const healthScore  = computeMoneyHealthScore(transactions);
+  const healthScore  = computeMoneyHealthScore(transactions, state.monthlyIncome || 0);
   const predicted    = predictNextMonthExpenses(transactions);
 
   // Spend by category (pie)
@@ -82,7 +82,7 @@ export default function Dashboard({ onAddTransaction }) {
       <div className="grid-4">
         {[
           { label: 'Total Balance', value: formatCurrency(balance, currency), sub: `${savingsRate}% savings rate`, gradient: 'var(--gradient-primary)', icon: '💼', cardGradient: 'var(--gradient-primary)' },
-          { label: 'Monthly Income', value: formatCurrency(totalIncome, currency), sub: state.monthlyIncome > 0 ? 'Budget setting' : 'This month (Logged)', gradient: 'var(--gradient-green)', icon: '📈', cardGradient: 'var(--gradient-green)' },
+          { label: 'Monthly Income', value: formatCurrency(totalIncome, currency), sub: state.monthlyIncome > 0 ? 'Base + Logged' : 'This month (Logged)', gradient: 'var(--gradient-green)', icon: '📈', cardGradient: 'var(--gradient-green)' },
           { label: 'Monthly Expense', value: formatCurrency(totalExpense, currency), sub: 'This month', gradient: 'var(--gradient-red)', icon: '📉', cardGradient: 'var(--gradient-red)' },
           { label: 'Predicted Next', value: formatCurrency(predicted, currency), sub: 'Based on last 3 months', gradient: 'var(--gradient-gold)', icon: '🔮', cardGradient: 'var(--gradient-gold)' },
         ].map((card, i) => (

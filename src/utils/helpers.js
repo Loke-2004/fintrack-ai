@@ -73,10 +73,11 @@ export function isCurrentWeek(dateStr) {
   return date >= startOfWeek && date < endOfWeek;
 }
 
-export function computeMoneyHealthScore(transactions) {
+export function computeMoneyHealthScore(transactions, monthlyIncomeObj = 0) {
   const now = new Date();
   const currentMonthTxs = transactions.filter((t) => isCurrentMonth(t.date));
-  const totalIncome = currentMonthTxs.filter((t) => t.type === 'income').reduce((s, t) => s + t.amount, 0);
+  const loggedIncome = currentMonthTxs.filter((t) => t.type === 'income').reduce((s, t) => s + t.amount, 0);
+  const totalIncome = monthlyIncomeObj + loggedIncome;
   const totalExpense = currentMonthTxs.filter((t) => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
 
   if (totalIncome === 0) return 50;
@@ -107,7 +108,7 @@ export function predictNextMonthExpenses(transactions) {
   return Math.round(avg);
 }
 
-export function detectSpendingInsights(transactions, budgets) {
+export function detectSpendingInsights(transactions, budgets, monthlyIncomeObj = 0) {
   const insights = [];
   const now = new Date();
   const currentMonthTxs = transactions.filter((t) => isCurrentMonth(t.date));
@@ -165,9 +166,10 @@ export function detectSpendingInsights(transactions, budgets) {
   }
 
   // Savings check
-  const income = currentMonthTxs.filter((t) => t.type === 'income').reduce((s, t) => s + t.amount, 0);
-  const savingsRate = income > 0 ? (income - currentExpense) / income : 0;
-  if (savingsRate < 0.1 && income > 0) {
+  const loggedIncome = currentMonthTxs.filter((t) => t.type === 'income').reduce((s, t) => s + t.amount, 0);
+  const totalIncome = monthlyIncomeObj + loggedIncome;
+  const savingsRate = totalIncome > 0 ? (totalIncome - currentExpense) / totalIncome : 0;
+  if (savingsRate < 0.1 && totalIncome > 0) {
     insights.push({
       type: 'danger',
       icon: '💸',
@@ -210,17 +212,18 @@ export function autoCategorizeTx(description) {
   return null;
 }
 
-export function checkAchievements(transactions, dispatch) {
+export function checkAchievements(transactions, dispatch, monthlyIncomeObj = 0) {
   const currentMonthTxs = transactions.filter((t) => isCurrentMonth(t.date));
-  const income = currentMonthTxs.filter((t) => t.type === 'income').reduce((s, t) => s + t.amount, 0);
+  const loggedIncome = currentMonthTxs.filter((t) => t.type === 'income').reduce((s, t) => s + t.amount, 0);
+  const totalIncome = monthlyIncomeObj + loggedIncome;
   const expense = currentMonthTxs.filter((t) => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
 
   const achievementList = [
     { id: 'first_tx', condition: transactions.length >= 1, title: '🎯 First Transaction', description: 'Logged your first transaction!' },
     { id: 'ten_tx', condition: transactions.length >= 10, title: '📝 10 Transactions', description: 'Logged 10 transactions!' },
-    { id: 'saver_20', condition: income > 0 && (income - expense) / income >= 0.2, title: '💰 20% Saver', description: 'Saved 20% of income this month!' },
-    { id: 'saver_30', condition: income > 0 && (income - expense) / income >= 0.3, title: '🏆 Super Saver', description: 'Saved 30%+ of income this month!' },
-    { id: 'budget_keeper', condition: expense < income * 0.7, title: '✅ Budget Keeper', description: 'Spent within 70% of your income!' },
+    { id: 'saver_20', condition: totalIncome > 0 && (totalIncome - expense) / totalIncome >= 0.2, title: '💰 20% Saver', description: 'Saved 20% of income this month!' },
+    { id: 'saver_30', condition: totalIncome > 0 && (totalIncome - expense) / totalIncome >= 0.3, title: '🏆 Super Saver', description: 'Saved 30%+ of income this month!' },
+    { id: 'budget_keeper', condition: expense < totalIncome * 0.7, title: '✅ Budget Keeper', description: 'Spent within 70% of your income!' },
   ];
 
   achievementList.forEach((a) => {

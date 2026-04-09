@@ -6,12 +6,13 @@ export default function Insights() {
   const { state } = useApp();
   const { transactions, budgets, currency } = state;
 
-  const insights  = useMemo(() => detectSpendingInsights(transactions, budgets), [transactions, budgets]);
-  const score     = useMemo(() => computeMoneyHealthScore(transactions), [transactions]);
+  const insights  = useMemo(() => detectSpendingInsights(transactions, budgets, state.monthlyIncome || 0), [transactions, budgets, state.monthlyIncome]);
+  const score     = useMemo(() => computeMoneyHealthScore(transactions, state.monthlyIncome || 0), [transactions, state.monthlyIncome]);
   const predicted = useMemo(() => predictNextMonthExpenses(transactions), [transactions]);
 
   const thisMonth = transactions.filter(t => isCurrentMonth(t.date));
-  const income    = thisMonth.filter(t => t.type === 'income').reduce((s,t) => s+t.amount, 0);
+  const loggedIncome = thisMonth.filter(t => t.type === 'income').reduce((s,t) => s+t.amount, 0);
+  const income    = (state.monthlyIncome || 0) + loggedIncome;
   const expense   = thisMonth.filter(t => t.type === 'expense').reduce((s,t) => s+t.amount, 0);
   const savings   = income - expense;
   const savingsPct = income > 0 ? Math.round((savings/income)*100) : 0;
@@ -24,7 +25,7 @@ export default function Insights() {
     const tips = [];
     if (savingsPct < 10) tips.push({ icon:'💡', text:'Try to cut discretionary spending to boost savings above 20%.' });
     if (savingsPct >= 20) tips.push({ icon:'🏆', text:'Great job! Keep maintaining your savings discipline.' });
-    if (expense > income) tips.push({ icon:'🚨', text:'You\'re spending more than you earn. Review your budget urgently.' });
+    if (expense > income && income > 0) tips.push({ icon:'🚨', text:'You\'re spending more than you earn. Review your budget urgently.' });
 
     const cats = Object.entries(budgets);
     cats.forEach(([cat, limit]) => {
