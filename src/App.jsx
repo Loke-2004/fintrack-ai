@@ -21,6 +21,7 @@ function AppInner() {
   const { state } = useApp();
   const [showModal, setShowModal] = useState(false);
   const [editingTx, setEditingTx] = useState(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', state.darkMode ? 'dark' : 'light');
@@ -44,9 +45,9 @@ function AppInner() {
 
   return (
     <div className="app-layout">
-      <Sidebar />
+      <Sidebar isOpen={isSidebarOpen} closeSidebar={() => setIsSidebarOpen(false)} />
       <div className="main-content">
-        <Header onAddTransaction={openAdd} />
+        <Header onAddTransaction={openAdd} toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} />
         <main className="page-content">
           {views[state.activeView] || views.dashboard}
         </main>

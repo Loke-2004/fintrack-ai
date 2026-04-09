@@ -13,12 +13,21 @@ const viewTitles = {
   settings: 'Settings',
 };
 
-export default function Header({ onAddTransaction }) {
+export default function Header({ onAddTransaction, toggleSidebar }) {
   const { state, dispatch } = useApp();
 
   return (
     <header className="header">
-      <div className="header-title">{viewTitles[state.activeView] || 'Dashboard'}</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <button 
+          className="btn btn-ghost btn-icon mobile-only" 
+          onClick={toggleSidebar}
+          style={{ fontSize: 20, padding: 4 }}
+        >
+          ☰
+        </button>
+        <div className="header-title">{viewTitles[state.activeView] || 'Dashboard'}</div>
+      </div>
       <div className="header-actions">
         {/* Currency Selector */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>

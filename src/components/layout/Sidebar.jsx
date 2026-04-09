@@ -13,7 +13,7 @@ const navItems = [
   { id: 'settings',      icon: '⚙️', label: 'Settings' },
 ];
 
-export default function Sidebar() {
+export default function Sidebar({ isOpen, closeSidebar }) {
   const { state, dispatch } = useApp();
   const { user, logout } = useAuth();
 
@@ -25,7 +25,9 @@ export default function Sidebar() {
   const email       = user?.email || '';
 
   return (
-    <aside className="sidebar">
+    <>
+      <div className={`sidebar-overlay ${isOpen ? 'open' : ''}`} onClick={closeSidebar} />
+      <aside className={`sidebar ${isOpen ? 'open' : ''}`}>
       <div className="sidebar-logo">
         <div className="sidebar-logo-icon">💸</div>
         <div className="sidebar-logo-text">
@@ -40,7 +42,7 @@ export default function Sidebar() {
           <button
             key={item.id}
             className={`nav-item ${state.activeView === item.id ? 'active' : ''}`}
-            onClick={() => dispatch({ type: 'SET_VIEW', payload: item.id })}
+            onClick={() => { dispatch({ type: 'SET_VIEW', payload: item.id }); closeSidebar?.(); }}
           >
             <span className="nav-item-icon">{item.icon}</span>
             {item.label}
@@ -52,7 +54,7 @@ export default function Sidebar() {
           <button
             key={item.id}
             className={`nav-item ${state.activeView === item.id ? 'active' : ''}`}
-            onClick={() => dispatch({ type: 'SET_VIEW', payload: item.id })}
+            onClick={() => { dispatch({ type: 'SET_VIEW', payload: item.id }); closeSidebar?.(); }}
           >
             <span className="nav-item-icon">{item.icon}</span>
             {item.label}
@@ -62,7 +64,7 @@ export default function Sidebar() {
         <div className="nav-section-label">Account</div>
         <button
           className={`nav-item ${state.activeView === 'settings' ? 'active' : ''}`}
-          onClick={() => dispatch({ type: 'SET_VIEW', payload: 'settings' })}
+          onClick={() => { dispatch({ type: 'SET_VIEW', payload: 'settings' }); closeSidebar?.(); }}
         >
           <span className="nav-item-icon">⚙️</span>
           Settings
@@ -100,5 +102,6 @@ export default function Sidebar() {
         </div>
       </div>
     </aside>
+    </>
   );
 }
