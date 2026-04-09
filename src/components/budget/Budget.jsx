@@ -12,6 +12,26 @@ export default function Budget() {
   const [tempAmt, setTempAmt] = useState('');
   const [quickSetMode, setQuickSetMode] = useState(false);
   const [quickAmts, setQuickAmts] = useState({});
+  const [quickIncome, setQuickIncome] = useState(state.monthlyIncome || '');
+  const [quickBudget, setQuickBudget] = useState(state.monthlyBudget || '');
+
+  const [editingIncome, setEditingIncome] = useState(false);
+  const [tempIncome, setTempIncome] = useState('');
+  
+  const [editingMonthlyBudget, setEditingMonthlyBudget] = useState(false);
+  const [tempMonthlyBudget, setTempMonthlyBudget] = useState('');
+
+  const calculatedOther = useMemo(() => {
+    let sum = 0;
+    CATEGORIES.expense.filter(c => c.id !== 'other_expense').forEach(c => {
+      const existing = budgets[c.id] || 0;
+      const val = quickAmts[c.id] !== undefined ? quickAmts[c.id] : existing;
+      const amt = val === '' ? 0 : parseFloat(val);
+      if (!isNaN(amt) && amt > 0) sum += amt;
+    });
+    const overall = parseFloat(quickBudget) || 0;
+    return Math.max(0, overall - sum);
+  }, [quickAmts, quickBudget, budgets]);
 
   const thisMonthExpenses = useMemo(() => {
     const map = {};
@@ -29,33 +49,81 @@ export default function Budget() {
   const totalRemaining = Math.max(0, totalBudget - totalSpent);
 
   const handleSave = (catId) => {
-    const amount = parseFloat(tempAmt);
+    const amount = parseFloat(tempAmt || 0);
     if (isNaN(amount) || amount < 0) {
-      addToast({ type: 'error', title: 'Invalid amount', message: 'Please enter a positive number.' });
+      addToast({ type: 'error', title: 'Invalid amount', message: 'Please enter a valid amount (0 or more).' });
       return;
     }
-    dispatch({ type: 'SET_BUDGET', payload: { category: catId, amount } });
-    addToast({ type: 'success', title: 'Budget set!', message: `${getCategoryInfo(catId, 'expense').name} → ${formatBudgetAmount(amount, currency)}/month` });
+
+    if (catId !== 'other_expense' && state.monthlyBudget > 0) {
+      let sum = 0;
+      CATEGORIES.expense.forEach(c => {
+        if (c.id === catId) sum += amount;
+        else if (c.id !== 'other_expense') sum += (budgets[c.id] || 0);
+      });
+      const otherAmt = Math.max(0, state.monthlyBudget - sum);
+      dispatch({ type: 'SET_BUDGET', payload: { category: catId, amount } });
+      dispatch({ type: 'SET_BUDGET', payload: { category: 'other_expense', amount: otherAmt } });
+      addToast({ type: 'success', title: 'Budget updated!', message: `${getCategoryInfo(catId, 'expense').name} set to ${formatBudgetAmount(amount, currency)}, Other adjusted to ${formatBudgetAmount(otherAmt, currency)}` });
+    } else {
+      dispatch({ type: 'SET_BUDGET', payload: { category: catId, amount } });
+      addToast({ type: 'success', title: 'Budget set!', message: `${getCategoryInfo(catId, 'expense').name} → ${amount === 0 ? 'No limit' : formatBudgetAmount(amount, currency)}/month` });
+    }
+
     setEditingCat(null);
     setTempAmt('');
   };
 
   const handleQuickSaveAll = () => {
     let saved = 0;
-    Object.entries(quickAmts).forEach(([catId, val]) => {
-      const amount = parseFloat(val);
-      if (!isNaN(amount) && amount > 0) {
-        dispatch({ type: 'SET_BUDGET', payload: { category: catId, amount } });
+    const incomeAmtFloat = parseFloat(quickIncome) || 0;
+    const overallBudgetAmtFloat = parseFloat(quickBudget) || 0;
+    dispatch({ type: 'SET_MONTHLY_INCOME', payload: incomeAmtFloat });
+    dispatch({ type: 'SET_MONTHLY_BUDGET', payload: overallBudgetAmtFloat });
+
+    CATEGORIES.expense.forEach(cat => {
+      let amount = 0;
+      if (cat.id === 'other_expense') {
+        amount = calculatedOther;
+      } else {
+        const val = quickAmts[cat.id] !== undefined ? quickAmts[cat.id] : budgets[cat.id];
+        amount = val === '' || val === undefined ? 0 : parseFloat(val);
+      }
+      
+      if (!isNaN(amount) && amount >= 0) {
+        dispatch({ type: 'SET_BUDGET', payload: { category: cat.id, amount } });
         saved++;
       }
     });
-    if (saved > 0) {
-      addToast({ type: 'success', title: 'Budgets saved!', message: `${saved} category budget${saved > 1 ? 's' : ''} set successfully.` });
+
+    if (saved > 0 || incomeAmtFloat > 0 || overallBudgetAmtFloat > 0) {
+      addToast({ type: 'success', title: 'Budgets saved!', message: 'Settings and monthly budgets updated successfully.' });
       setQuickSetMode(false);
       setQuickAmts({});
     } else {
       addToast({ type: 'error', title: 'No amounts entered', message: 'Enter at least one budget amount.' });
     }
+  };
+
+  const saveIncome = () => {
+    dispatch({ type: 'SET_MONTHLY_INCOME', payload: parseFloat(tempIncome) || 0 });
+    setEditingIncome(false);
+    addToast({ type: 'success', title: 'Income Updated', message: 'Monthly income saved.' });
+  };
+
+  const saveOverallBudget = () => {
+    const newOverall = parseFloat(tempMonthlyBudget) || 0;
+    dispatch({ type: 'SET_MONTHLY_BUDGET', payload: newOverall });
+    
+    let sum = 0;
+    CATEGORIES.expense.forEach(c => {
+      if (c.id !== 'other_expense') sum += (budgets[c.id] || 0);
+    });
+    const otherAmt = Math.max(0, newOverall - sum);
+    dispatch({ type: 'SET_BUDGET', payload: { category: 'other_expense', amount: otherAmt } });
+    
+    setEditingMonthlyBudget(false);
+    addToast({ type: 'success', title: 'Budget Updated', message: 'Overall monthly budget saved.' });
   };
 
   // ── Quick Setup Wizard ──────────────────────────────────────────────
@@ -87,6 +155,29 @@ export default function Budget() {
           </div>
         </div>
 
+        {/* Overall values */}
+        <div className="card">
+          <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 20 }}>
+            Set Overall Monthly Limits:
+          </div>
+          <div style={{ display: 'flex', gap: 14 }}>
+            <div style={{ flex: 1 }}>
+              <label className="form-label">Monthly Income</label>
+              <div style={{ position: 'relative' }}>
+                <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', fontSize: 16, fontWeight: 700 }}>{currency.symbol}</span>
+                <input type="number" min="0" step="1" className="input" style={{ paddingLeft: 32 }} value={quickIncome} onChange={e => setQuickIncome(e.target.value)} placeholder="0" />
+              </div>
+            </div>
+            <div style={{ flex: 1 }}>
+              <label className="form-label">Overall Budget</label>
+              <div style={{ position: 'relative' }}>
+                <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', fontSize: 16, fontWeight: 700 }}>{currency.symbol}</span>
+                <input type="number" min="0" step="1" className="input" style={{ paddingLeft: 32 }} value={quickBudget} onChange={e => setQuickBudget(e.target.value)} placeholder="0" />
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Category inputs */}
         <div className="card">
           <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 20 }}>
@@ -94,6 +185,21 @@ export default function Budget() {
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             {CATEGORIES.expense.map(cat => {
+              if (cat.id === 'other_expense') {
+                return (
+                  <div key={cat.id} style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                    <div style={{ width: 42, height: 42, borderRadius: 'var(--radius-md)', flexShrink: 0, background: `${cat.color}22`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>{cat.icon}</div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}>{cat.name} <span style={{fontSize: 10, color: 'var(--text-muted)'}}>(Auto-calculated)</span></div>
+                    </div>
+                    <div style={{ position: 'relative', width: 160 }}>
+                      <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', fontSize: 14, fontWeight: 700 }}>{currency.symbol}</span>
+                      <input type="number" className="input" style={{ paddingLeft: 28, width: '100%', background: 'var(--bg-card)' }} disabled value={calculatedOther} />
+                    </div>
+                  </div>
+                );
+              }
+
               const existing = budgets[cat.id] || '';
               const val = quickAmts[cat.id] !== undefined ? quickAmts[cat.id] : (existing || '');
               return (
@@ -143,12 +249,47 @@ export default function Budget() {
   // ── Main Budget View (budgets exist) ────────────────────────────────
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+      {/* Top Setting Inputs */}
+      <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+        <div className="card" style={{ flex: 1, minWidth: 280 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-muted)' }}>Monthly Income</div>
+          {editingIncome ? (
+            <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+              <input type="number" min="0" className="input" style={{flex: 1}} value={tempIncome} onChange={e => setTempIncome(e.target.value)} />
+              <button className="btn btn-success btn-sm" onClick={saveIncome}>Save</button>
+              <button className="btn btn-ghost btn-sm" onClick={() => setEditingIncome(false)}>✕</button>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
+              <div style={{ fontSize: 28, fontFamily: 'Outfit,sans-serif', fontWeight: 800 }}>{formatBudgetAmount(state.monthlyIncome || 0, currency)}</div>
+              <button className="btn btn-ghost btn-sm" onClick={() => { setTempIncome(state.monthlyIncome || 0); setEditingIncome(true); }}>✏️ Edit</button>
+            </div>
+          )}
+        </div>
+
+        <div className="card" style={{ flex: 1, minWidth: 280 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-muted)' }}>Overall Expenses Budget</div>
+          {editingMonthlyBudget ? (
+            <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+              <input type="number" min="0" className="input" style={{flex: 1}} value={tempMonthlyBudget} onChange={e => setTempMonthlyBudget(e.target.value)} />
+              <button className="btn btn-success btn-sm" onClick={saveOverallBudget}>Save</button>
+              <button className="btn btn-ghost btn-sm" onClick={() => setEditingMonthlyBudget(false)}>✕</button>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
+              <div style={{ fontSize: 28, fontFamily: 'Outfit,sans-serif', fontWeight: 800 }}>{formatBudgetAmount(state.monthlyBudget || 0, currency)}</div>
+              <button className="btn btn-ghost btn-sm" onClick={() => { setTempMonthlyBudget(state.monthlyBudget || 0); setEditingMonthlyBudget(true); }}>✏️ Edit</button>
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Overview card */}
       <div className="card" style={{ background: 'var(--gradient-primary)', border: 'none' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 16 }}>
           <div>
             <div style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.7)', marginBottom: 8, letterSpacing: '0.5px', textTransform: 'uppercase' }}>
-              Total Monthly Budget
+              Total Budget Status
             </div>
             <div style={{ fontSize: 36, fontFamily: 'Outfit,sans-serif', fontWeight: 800, color: 'white' }}>
               {formatBudgetAmount(totalBudget, currency)}
@@ -165,7 +306,7 @@ export default function Budget() {
               style={{ background: 'rgba(255,255,255,0.2)', color: 'white', border: '1px solid rgba(255,255,255,0.3)', marginTop: 4 }}
               onClick={() => setQuickSetMode(true)}
             >
-              ✏️ Edit All
+              🎯 Full Setup Wizard
             </button>
           </div>
         </div>
@@ -178,7 +319,7 @@ export default function Budget() {
       <div className="card">
         <div className="section-header">
           <div className="section-title">🎯 Category Budgets</div>
-          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Click ✏️ to edit a category</span>
+          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Click ✏️ to edit a category (Other is auto-calculated)</span>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
           {CATEGORIES.expense.map(cat => {
@@ -230,9 +371,11 @@ export default function Budget() {
                     ) : (
                       <>
                         {!noBudget && <span style={{ fontFamily: 'Outfit,sans-serif', fontSize: 16, fontWeight: 800, color: isOver ? 'var(--accent-red)' : 'var(--text-primary)' }}>{pct}%</span>}
-                        <button className="btn btn-ghost btn-sm" onClick={() => { setEditingCat(cat.id); setTempAmt(budget ? budget.toString() : ''); }}>
-                          {noBudget ? '+ Set' : '✏️'}
-                        </button>
+                        {cat.id !== 'other_expense' && (
+                          <button className="btn btn-ghost btn-sm" onClick={() => { setEditingCat(cat.id); setTempAmt(budget ? budget.toString() : ''); }}>
+                            {noBudget ? '+ Set' : '✏️'}
+                          </button>
+                        )}
                       </>
                     )}
                   </div>

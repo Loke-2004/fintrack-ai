@@ -14,10 +14,11 @@ function getInitialState(uid) {
       return { ...parsed, currency, activeView: 'dashboard' };
     }
   } catch (e) {}
-  // Fresh empty state — user sets everything themselves
   return {
     transactions: [],
     budgets: {},          // empty: user must set budgets manually
+    monthlyIncome: 0,
+    monthlyBudget: 0,
     currency: CURRENCIES[0],
     darkMode: true,
     activeView: 'dashboard',
@@ -48,6 +49,12 @@ function appReducer(state, action) {
     case 'SET_BUDGET':
       return { ...state, budgets: { ...state.budgets, [action.payload.category]: action.payload.amount } };
 
+    case 'SET_MONTHLY_INCOME':
+      return { ...state, monthlyIncome: action.payload };
+
+    case 'SET_MONTHLY_BUDGET':
+      return { ...state, monthlyBudget: action.payload };
+
     case 'SET_CURRENCY':
       return { ...state, currency: action.payload };
 
@@ -72,12 +79,13 @@ function appReducer(state, action) {
 export function AppProvider({ children, uid }) {
   const [state, dispatch] = useReducer(appReducer, getInitialState(uid));
 
-  // Persist to per-user localStorage key
   useEffect(() => {
     const key = uid ? `fintrack_${uid}` : 'fintrack_guest';
     localStorage.setItem(key, JSON.stringify({
       transactions:  state.transactions,
       budgets:       state.budgets,
+      monthlyIncome: state.monthlyIncome,
+      monthlyBudget: state.monthlyBudget,
       currency:      state.currency,
       darkMode:      state.darkMode,
       splitGroups:   state.splitGroups,
