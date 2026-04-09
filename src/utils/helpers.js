@@ -2,8 +2,7 @@ import { CATEGORIES, CURRENCIES } from '../data/sampleData';
 
 export function formatCurrency(amount, currency) {
   const curr = currency || CURRENCIES[0];
-  const converted = amount * curr.rate;
-  return `${curr.symbol}${converted.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return `${curr.symbol}${Number(amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 // For budget amounts — no rate conversion, they're already in the display currency
